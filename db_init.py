@@ -4,7 +4,6 @@ import os
 import psycopg2
 import time
 import warnings
-from transliterate import translit
 import gdown
 import datetime
 
@@ -77,7 +76,7 @@ make_sql_req('DROP SCHEMA raw CASCADE')
 make_sql_req('DROP SCHEMA ods CASCADE')
 make_sql_req('CREATE SCHEMA raw')
 make_sql_req('CREATE SCHEMA ods')
-
+print('======Созданы схемы ODS и RAW======')
 
 
 # Загрузка сырых данных
@@ -137,15 +136,25 @@ make_sql_req('CREATE SCHEMA ods')
 
 # Загрузка сырых данных
 gdown.download('https://drive.google.com/uc?id=1KqbCw6_-ZoO8iurdy9PZDhOktwHqLYc0')
-gdown.download('https://drive.google.com/uc?id=1q4AF9MQT2cOUSe52FkcInYijqnmPcF6a')
+gdown.download('https://drive.google.com/uc?id=1t14g4aVs7H4-bNF5uvy3xBz6jAJDEOt3')
+print('====Данные загружены с гугл диска======')
 df_x_executing = pd.read_parquet('dataset_for_demonstration_sensors.parquet')
-df_y_executing = pd.read_parquet('dataset_for_demonstration_status.parquet')
+## TODO - remove
+# df_x_executing = df_x_executing[df_x_executing['agg_num'].isin([4,5])]
 create_tab(df_x_executing, dtypes_dict, 'raw.sensor_telemetry')
-create_tab(df_y_executing, dtypes_dict, 'raw.sensor_telemetry')
-insert_init_data(df_x_executing, 'raw.sensor_telemetry')
+batch_size = 500_000
+batches = len(df_x_executing)//batch_size + 1
+for i in range(batches):
+    df_batch = df_x_executing[i*batch_size:(i+1)*batch_size]
+    insert_init_data(df_batch, 'raw.sensor_telemetry')
+    print(f'Batch {i+1} / {batches+1} was inserted')
+## Нужная только схема таблицы
+df_y_executing = pd.read_parquet('dataset_for_demonstration_status.parquet')[:3]
+create_tab(df_y_executing, dtypes_dict, 'raw.tm_status')
 
+print('====Сырые данные загружены в БД======')
 
-
+## Создание таблиц для предиктов модели
 q_m1_agg = """CREATE TABLE IF NOT EXISTS ods.m1_agg_status (
    aggregate_id bigint,
    status varchar,
@@ -158,9 +167,9 @@ q_m1_agg = """CREATE TABLE IF NOT EXISTS ods.m1_agg_status (
 q_m3_tm = """CREATE TABLE IF NOT EXISTS ods.m3_tm_status (
    aggregate_id bigint,
    status varchar,
-   tm bigint,
-   reason varchar,
-   update_time timestamp);"""
+   tm varchar,
+   upd_time timestamp);"""
 
-make_sql_req(q_m1)
-make_sql_req(q_m3)
+make_sql_req(q_m1_agg)
+make_sql_req(q_m3_tm)
+print('Созданы таблицы для предиктов модели')
