@@ -7,11 +7,13 @@ docker run -dit --name postgres_db -e POSTGRES_DB=plant_database -e POSTGRES_USE
 	-e POSTGRES_PASSWORD=pass -e PGDATA=/var/lib/postgresql/data/pgdata --ip 172.27.0.5 -p 5432:5432 -u 0 --network plant_network postgres
 # Создать PgAdmin
 docker run -dit -e PGADMIN_DEFAULT_PASSWORD=pass -e PGADMIN_DEFAULT_EMAIL=email@ex.com --name pgadmin --ip 172.27.0.6 -p 80:80 -u 0 --network plant_network dpage/pgadmin4
-# Создать ml python backend
-docker run -dit --name python_container -p 8889:8888 -v ./:./ --network plant_network -u 0 python_server
+# Создать ML python backend
+docker run -dit --name python_container -p 8889:8888 -v .:./ --network plant_network -u 0 python_server
 # Подождать, пока докеры откроются
 sleep 10
-# Загрузка данных в БД
+# Установки необходимых библиотек
+docker exec -it python_container pip3 install -r requirements.txt
+# Загрузка данных в БД 
 docker exec -it python_container python3 ./db_init.py
 # Запуск ML моделей
-docker exec -it python_container python3 ./run_ml.py
+# docker exec -dit python_container python3 ./run_ml.py
