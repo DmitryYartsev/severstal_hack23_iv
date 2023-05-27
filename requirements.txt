@@ -1,0 +1,12 @@
+torch
+pyarrow
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+tqdm
+catboost
+psycopg2-binary
+openpyxl
+gdown
