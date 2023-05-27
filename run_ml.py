@@ -156,7 +156,7 @@ def preprocessing_pipeline_m3(data):
         data[agg_num]['data'] = generate_features_m3(agg_num, data, table = 'data')
         data[agg_num]['data'] = data[agg_num]['data'][data[agg_num]['x_cols']]
         data[agg_num]['data'] = (data[agg_num]['data'] - data[agg_num]['means'])/data[agg_num]['std']
-        median = data[agg_num]['data'].median()
+        median = data[agg_num]['median']
         data[agg_num]['data'] = data[agg_num]['data'].fillna(method='ffill').fillna(median)
     return data
 
