@@ -8,7 +8,7 @@ cd severstal_hack23_iv-main </br>
 sudo bash run_service.sh </br>
 ```
 2. **<br> Далее необходимо развернуть подключить Grafana</br>
-- Зайти на 
+- Зайти на host:3000, ввести admin\admin
 - Необходимо нажать на список меню позле вкладки Home (левый верхний угол) и выбрать Connections
 - В поле search all ввести postgresql и выбрать БД
 - Справа нажать на create a PostgresQL data source
