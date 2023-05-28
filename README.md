@@ -3,8 +3,8 @@
 1. **<br>Для развертывание сервиса локально, необходимо ввести следующие команды: </br>
 ```
 git clone https://github.com/DmitryYartsev/severstal_hack23_iv.git
-sudo chmod -R 777 severstal_hack23_iv-main
-cd severstal_hack23_iv-main
+sudo chmod -R 777 severstal_hack23_iv
+cd severstal_hack23_iv
 sudo bash run_service.sh
 ```
 2. **<br> Далее необходимо развернуть подключить Grafana</br>
