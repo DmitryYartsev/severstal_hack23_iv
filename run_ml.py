@@ -222,8 +222,6 @@ def insert_preds_m1(data):
         pred.loc[pred['aggregate_id']==agg_num, 'status'] = status
         pred.loc[pred['aggregate_id']==agg_num, 'time_to_downtime'] = time_to_downtime
         pred['update_time'] = str(datetime.datetime.now())
-
-    print(pred)
     conn = psycopg2.connect(**db_params)
     nrows = pd.read_sql(f'select count(*) from ods.m1_agg_status', conn).values[0][0]
     conn.close()
@@ -263,21 +261,21 @@ def insert_preds_m3(data):
 
         
 while True:
-    # try:
-    data = get_telemetry_data()
-    ## ========================= Предсказания для M3 ==================================
-    for agg_num in agg_l:
-        for k,v in params_m3[agg_num].items(): data[agg_num][k] = v
-    data_m3 = copy.deepcopy(data)
-    data_m3 = preprocessing_pipeline_m3(data_m3)
-    insert_preds_m3(data_m3)
-    ## ========================= Предсказания для M1 ==================================
-    data_m1 = copy.deepcopy(data)
-    insert_preds_m1(data_m1)
+    try:
+        data = get_telemetry_data()
+        ## ========================= Предсказания для M3 ==================================
+        for agg_num in agg_l:
+            for k,v in params_m3[agg_num].items(): data[agg_num][k] = v
+        data_m3 = copy.deepcopy(data)
+        data_m3 = preprocessing_pipeline_m3(data_m3)
+        insert_preds_m3(data_m3)
+        ## ========================= Предсказания для M1 ==================================
+        data_m1 = copy.deepcopy(data)
+        insert_preds_m1(data_m1)
 
 
-    # except Exception as e:
-    #     print(e)
-    #     time.sleep(3)
+    except Exception as e:
+        print(e)
+        time.sleep(3)
 
 

@@ -15,7 +15,6 @@ docker exec -it python_backend_ml pip3 install -r ./requirements.txt
 :: CPU версия pytorch
 docker exec -it python_backend_ml pip3 install torch --index-url https://download.pytorch.org/whl/cpu
 
-
 :: Загрузка данных в БД 
 docker exec -it python_backend_ml python3 ./db_init.py
 :: Запуск ML моделей
