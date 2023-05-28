@@ -151,7 +151,8 @@ def generate_features_m3(agg_num, data, table = 'data'):
     return data[agg_num][table]
 
 
-
+## Функции для генерации фичей
+## TODO - добавить полный список фичей из модели
 def generate_features_m1(agg_num, data, table = 'data'):
     win_sizes = ['2h']
     x = pd.DataFrame()
@@ -179,7 +180,6 @@ def generate_features_m1(agg_num, data, table = 'data'):
 
 
 
-
 def preprocessing_pipeline_m3(data):
     cols_to_drop = ['ТОК РОТОРА 2']
     for agg_num in agg_l:
@@ -193,7 +193,30 @@ def preprocessing_pipeline_m3(data):
     return data
 
 
-## TODO - поменять словарь на значения по скору
+status_m3_dict = {0:'OK', 2:'M3'}
+def insert_preds_m3(data):
+    for agg_num in agg_l:
+        x = torch.Tensor(data[agg_num]['data'][data[agg_num]['x_cols']].values)[-1:]
+        pred = models_m3[f'm3_{agg_num}'](x).round().detach().numpy()*2
+        pred = pred.astype('uint8')[0]
+        status = [status_m3_dict[i] for i in pred]
+        pred = pd.DataFrame()
+        pred['status'] = status
+        pred['tm'] = data[agg_num]['y_proc_columns']
+        pred['aggregate_id'] = agg_num
+        pred['upd_time'] = datetime.datetime.now()
+        conn = psycopg2.connect(**db_params)
+        nrows = pd.read_sql(f'select count(*) from ods.m3_tm_status where aggregate_id={agg_num}', conn).values[0][0]
+        conn.close()
+        if nrows==0:
+            insert_init_data(pred, 'ods.m3_tm_status')
+        else:
+            for n, i in pred.iterrows():
+                q = f"""UPDATE ods.m3_tm_status SET status='{i['status']}', upd_time='{str(i['upd_time'])}'  WHERE aggregate_id={i['aggregate_id']} and tm='{i['tm']}';"""
+                make_sql_req(q)
+
+
+## TODO - поменять словарь на значения по скору из модели
 most_freq_tm = {4:'РОТОР',5:'ПОДШИПНИК ОПОРНЫЙ №1',6:'ЗАДВИЖКА',7:'РОТОР',8:'РОТОР',9:'ТР-Р ТМ-6300-10/6'}
 def insert_preds_m1(data):
     cols_to_drop = ['ТОК РОТОРА 2']
@@ -222,6 +245,7 @@ def insert_preds_m1(data):
         pred.loc[pred['aggregate_id']==agg_num, 'status'] = status
         pred.loc[pred['aggregate_id']==agg_num, 'time_to_downtime'] = time_to_downtime
         pred['update_time'] = str(datetime.datetime.now())
+
     conn = psycopg2.connect(**db_params)
     nrows = pd.read_sql(f'select count(*) from ods.m1_agg_status', conn).values[0][0]
     conn.close()
@@ -237,27 +261,6 @@ WHERE aggregate_id={i['aggregate_id']};"""
 
 
 
-status_m3_dict = {0:'OK', 2:'M3'}
-def insert_preds_m3(data):
-    for agg_num in agg_l:
-        x = torch.Tensor(data[agg_num]['data'][data[agg_num]['x_cols']].values)[-1:]
-        pred = models_m3[f'm3_{agg_num}'](x).round().detach().numpy()*2
-        pred = pred.astype('uint8')[0]
-        status = [status_m3_dict[i] for i in pred]
-        pred = pd.DataFrame()
-        pred['status'] = status
-        pred['tm'] = data[agg_num]['y_proc_columns']
-        pred['aggregate_id'] = agg_num
-        pred['upd_time'] = datetime.datetime.now()
-        conn = psycopg2.connect(**db_params)
-        nrows = pd.read_sql(f'select count(*) from ods.m3_tm_status where aggregate_id={agg_num}', conn).values[0][0]
-        conn.close()
-        if nrows==0:
-            insert_init_data(pred, 'ods.m3_tm_status')
-        else:
-            for n, i in pred.iterrows():
-                q = f"""UPDATE ods.m3_tm_status SET status='{i['status']}', upd_time='{str(i['upd_time'])}'  WHERE aggregate_id={i['aggregate_id']} and tm='{i['tm']}';"""
-                make_sql_req(q)
 
         
 while True:
