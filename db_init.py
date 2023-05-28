@@ -158,8 +158,8 @@ print('====Сырые данные загружены в БД======')
 q_m1_agg = """CREATE TABLE IF NOT EXISTS ods.m1_agg_status (
    aggregate_id bigint,
    status varchar,
-   time_to_downtime bigint,
-   tm bigint,
+   time_to_downtime varchar,
+   tm varchar,
    reason varchar,
    update_time timestamp);"""
 
