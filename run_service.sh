@@ -19,4 +19,4 @@ docker exec -it python_backend_ml pip3 install torch --index-url https://downloa
 # Загрузка данных в БД 
 docker exec -it python_backend_ml python3 ./db_init.py
 # Запуск ML моделей
-docker exec -dit python_backend_ml python3 ./run_ml.py
+docker exec -it python_backend_ml python3 ./run_ml.py

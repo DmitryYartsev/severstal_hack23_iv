@@ -8,6 +8,7 @@ import os
 import datetime
 import psycopg2
 import warnings
+import time
 
 
 
@@ -149,6 +150,36 @@ def generate_features_m3(agg_num, data, table = 'data'):
     data[agg_num][table]['nan_score'] = nan_score
     return data[agg_num][table]
 
+
+
+def generate_features_m1(agg_num, data, table = 'data'):
+    win_sizes = ['2h']
+    x = pd.DataFrame()
+    cols = list(data[agg_num]['thresholds']['min'].index)
+    for n, ws in enumerate(win_sizes):
+        # Сколько фичей за выбранный период агрегации были меньше чем квантиль 0.025
+        min_score = (data[agg_num][table][cols]<data[agg_num]['thresholds']['min']).rolling(ws).sum()\
+                        .fillna(method='ffill')
+        min_score = get_group_stats(min_score, split_by_group=False)
+        # Сколько фичей за выбранный период агрегации были Больше чем квантиль 0.98 
+        max_score = (data[agg_num][table][cols]>data[agg_num]['thresholds']['max']).rolling(ws).sum()\
+                        .fillna(method='ffill')
+        max_score = get_group_stats(max_score, split_by_group=False)
+        # Объеденение min и max
+        quantile_outlier = min_score + max_score
+        quantile_outlier.columns = [f'{i}_{ws}_quantile_stats' for i in quantile_outlier.columns]
+                        
+        
+        if n==0:
+            x = quantile_outlier.copy()
+        else:
+            x = pd.concat([x, quantile_outlier], axis=1)
+        del quantile_outlier
+    return x
+
+
+
+
 def preprocessing_pipeline_m3(data):
     cols_to_drop = ['ТОК РОТОРА 2']
     for agg_num in agg_l:
@@ -156,12 +187,60 @@ def preprocessing_pipeline_m3(data):
         data[agg_num]['data'] = generate_features_m3(agg_num, data, table = 'data')
         data[agg_num]['data'] = data[agg_num]['data'][data[agg_num]['x_cols']]
         data[agg_num]['data'] = (data[agg_num]['data'] - data[agg_num]['means'])/data[agg_num]['std']
-        median = data[agg_num]['median']
+        ## repalce to median from train
+        median = data[agg_num]['data'].median()
         data[agg_num]['data'] = data[agg_num]['data'].fillna(method='ffill').fillna(median)
     return data
 
+
+## TODO - поменять словарь на значения по скору
+most_freq_tm = {4:'РОТОР',5:'ПОДШИПНИК ОПОРНЫЙ №1',6:'ЗАДВИЖКА',7:'РОТОР',8:'РОТОР',9:'ТР-Р ТМ-6300-10/6'}
+def insert_preds_m1(data):
+    cols_to_drop = ['ТОК РОТОРА 2']
+    pred = pd.DataFrame()
+    pred['aggregate_id'] = agg_l
+    pred['status'] = None
+    pred['time_to_downtime'] = None
+    pred['tm'] = None
+    for agg_num in agg_l:
+        data[agg_num]['data'].drop(columns = cols_to_drop, inplace=True)
+        data[agg_num]['data'] = generate_features_m3(agg_num, data, table = 'data')
+        v = data[agg_num]['data'].values[-1][0]
+        if 4000>v>2800:
+            status='Warning'
+            time_to_downtime = str(datetime.timedelta(seconds = (4000 - v)*84600/1200))
+            tm = most_freq_tm[agg_l]
+        elif v>=4000:
+            status='M1'
+            time_to_downtime = str(datetime.timedelta(seconds = 0))
+            tm = most_freq_tm[agg_l]
+        else:
+            status='OK'
+            time_to_downtime = '-'
+            tm = '-'
+        pred.loc[pred['aggregate_id']==agg_num, 'tm'] = tm
+        pred.loc[pred['aggregate_id']==agg_num, 'status'] = status
+        pred.loc[pred['aggregate_id']==agg_num, 'time_to_downtime'] = time_to_downtime
+        pred['update_time'] = str(datetime.datetime.now())
+
+    print(pred)
+    conn = psycopg2.connect(**db_params)
+    nrows = pd.read_sql(f'select count(*) from ods.m1_agg_status', conn).values[0][0]
+    conn.close()
+
+    if nrows==0:
+        insert_init_data(pred[['aggregate_id', 'status', 'time_to_downtime', 'update_time']], 'ods.m1_agg_status')
+    else:
+        for n, i in pred.iterrows():
+            q = f"""UPDATE ods.m1_agg_status SET status='{i['status']}', tm='{i['tm']}', update_time='{str(i['update_time'])}', time_to_downtime='{str(i['time_to_downtime'])}' 
+WHERE aggregate_id={i['aggregate_id']};"""
+            make_sql_req(q)
+
+
+
+
 status_m3_dict = {0:'OK', 2:'M3'}
-def insert_preds(data):
+def insert_preds_m3(data):
     for agg_num in agg_l:
         x = torch.Tensor(data[agg_num]['data'][data[agg_num]['x_cols']].values)[-1:]
         pred = models_m3[f'm3_{agg_num}'](x).round().detach().numpy()*2
@@ -184,14 +263,21 @@ def insert_preds(data):
 
         
 while True:
+    # try:
     data = get_telemetry_data()
     ## ========================= Предсказания для M3 ==================================
     for agg_num in agg_l:
         for k,v in params_m3[agg_num].items(): data[agg_num][k] = v
     data_m3 = copy.deepcopy(data)
     data_m3 = preprocessing_pipeline_m3(data_m3)
-    insert_preds(data_m3)
+    insert_preds_m3(data_m3)
     ## ========================= Предсказания для M1 ==================================
+    data_m1 = copy.deepcopy(data)
+    insert_preds_m1(data_m1)
 
+
+    # except Exception as e:
+    #     print(e)
+    #     time.sleep(3)
 
 
